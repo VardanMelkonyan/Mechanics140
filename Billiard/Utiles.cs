@@ -33,7 +33,7 @@ internal class Utils
         return res;
     }
 
-    public static LineSegment randomLineSegment(Surface surface)
+    public static LineSegment RandomLineSegment(Surface surface)
     {
         return new LineSegment(RandomPoint(surface), RandomPoint(surface));
     }
@@ -73,6 +73,16 @@ internal class Utils
             Vector2 interception = origin + (direction * t);
             return interception;
         }
+    }
+    
+    public static Vector2 CalculateBallTrajectory(float initialHeight, Vector3 initialMomentum, float time)
+    {
+        float gravity = 10; // Acceleration due to gravity (m/s^2)
+
+        float x = initialMomentum.X * time; // Horizontal position (x)
+        float y = (float)(initialHeight + (initialMomentum.Y * time) - (0.5 * gravity * time * time)); // Vertical position (y)
+
+        return new Vector2(x, y);
     }
 
     public static Vector2 ReflectVector(Vector2 vector, Circle circle, Vector2 point)
@@ -165,6 +175,17 @@ internal class Utils
             slope = line_slope;
             yIntercept = line_yIntercept;
         }
+
+
+        public float CorrespondingY(float x)
+        {
+            return slope * x + yIntercept;
+        }
+        
+        public float CorrespondingX(float y)
+        {
+            return (y - yIntercept) / slope;
+        }
     }
 
 
@@ -175,7 +196,7 @@ internal class Utils
 
         public Vector2 start;
 
-        public LineSegment(Vector2 start, Vector2 end) : this(start, end, 0.5)
+        public LineSegment(Vector2 start, Vector2 end) : this(start, end, 1)
         {
         }
 
@@ -185,7 +206,7 @@ internal class Utils
             this.end = end;
             Vector2 vector = end - start;
             slope = vector.Y / vector.X;
-            yIntercept = start.X - slope * start.Y;
+            yIntercept = start.Y - slope * start.X;
             this.delta = delta;
         }
 
@@ -195,48 +216,85 @@ internal class Utils
             
             bool isWithinXBoundaries = (x >= start.X ^ x <= end.X);
             bool isWithinYBoundaries = (y >= start.Y ^ y <= end.Y);
-            if (!isWithinXBoundaries || !isWithinYBoundaries)
+            if (isWithinXBoundaries && isWithinYBoundaries)
                 return false;
-            // Calculate the distance between the point and the line defined by the segment
-            var distance = CalculateDistance(x, y);
 
-            // Check if the distance is within the specified delta tolerance
-            return distance <= delta;
+            float expectedY = CorrespondingY(x);
+            float diffY = expectedY - y;
+            float expectedX = CorrespondingX(y);
+            float diffX = expectedX - x;
+            return (-delta <= diffY && diffY <= delta) || (-delta <= diffX && diffX <= delta);
+        }
+    }
+    
+    public class GravityParabola : Expression
+    {
+        public Vector2 start;
+        public Vector2 momentum0;
+        private float delta;
+        public GravityParabola(Vector2 start, Vector2 momentum0)
+        {
+            this.start = start;
+            this.momentum0 = momentum0;
+        }
+        
+        // Function to calculate the trajectory equation y(x)
+        public float CorrespondingY(float x)
+        {
+            float g = 10; // Acceleration due to gravity (m/s^2)
+            float m = 1; // Mass of the ball
+
+            // Calculate the angle theta of the momentum vector
+            double theta = Math.Atan2(momentum0.Y, momentum0.X);
+
+            // Calculate the initial speed
+            Vector2 v = Vector2.Divide(momentum0, m);
+
+            // Calculate the vertical displacement y as a function of horizontal position x
+            float y = (float)(start.Y + (x * Math.Tan(theta)) - ((g * x * x) / (2 * v.LengthSquared)));
+
+            return y;
         }
 
-        private float CalculateDistance(float x, float y)
+        public override bool PointBelongToExpression(float x, float y)
         {
-            // Calculate the line segment's length
-            var segmentLength = CalculateSegmentLength();
-
-            if (segmentLength == 0)
-                // The segment is just a point, so return the distance between the point and that point
-                return CalculatePointDistance(x, y, start.X, start.Y);
-
-            // Calculate the area of the triangle formed by the point and the line segment
-            var triangleArea = CalculateTriangleArea(x, y);
-
-            // Calculate the distance between the point and the line defined by the segment
-            var distance = 2 * triangleArea / segmentLength;
-
-            return distance;
+            float expectedY = CorrespondingY(x);
+            float diffY = expectedY - y;
+            float expectedX = CorrespondingX(y);
+            float diffX = expectedX - x;
+            return (-delta <= diffY && diffY <= delta) || (-delta <= diffX && diffX <= delta);
         }
-
-        private float CalculateSegmentLength()
+        public float CorrespondingX(float y)
         {
-            // Calculate the length of the line segment using the distance formula
-            var lengthX = end.X - start.X;
-            var lengthY = end.Y - start.Y;
+            float g = 10; // Acceleration due to gravity (m/s^2)
+            float m = 1; // Mass of the ball
 
-            return (float)Math.Sqrt(lengthX * lengthX + lengthY * lengthY);
-        }
+            // Calculate the angle theta of the momentum vector
+            double theta = Math.Atan2(momentum0.Y, momentum0.X);
 
-        private float CalculateTriangleArea(float x, float y)
-        {
-            // Calculate the area of the triangle formed by the point and the line segment using the shoelace formula
-            var area = 0.5f * (start.X * (end.Y - y) + x * (start.Y - end.Y) + end.X * (y - start.Y));
+            // Calculate the initial speed
+            Vector2 v = Vector2.Divide(momentum0, m);
 
-            return Math.Abs(area);
+            // Solve the quadratic equation for x
+            float a = (float)-0.5 * g / v.LengthSquared;
+            float b = (float)Math.Tan(theta);
+            float c = y - start.Y;
+
+            float discriminant = b * b - 4 * a * c;
+
+            if (discriminant >= 0)
+            {
+                float sqrtDiscriminant = (float)Math.Sqrt(discriminant);
+                float x1 = (-b + sqrtDiscriminant) / (2 * a);
+                float x2 = (-b - sqrtDiscriminant) / (2 * a);
+
+                // Choose the positive solution for x
+                float x = Math.Max(x1, x2);
+                return x;
+            }
+
+            // No real solutions for x
+            return float.NaN;
         }
     }
 }

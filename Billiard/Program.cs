@@ -66,8 +66,13 @@ internal class Game : GameWindow
 
     private int VertexShader;
 
-    public Game(NativeWindowSettings settings) : base(GameWindowSettings.Default, settings)
+    private int i = 0;
+
+    private string task;
+
+    public Game(NativeWindowSettings settings, string task) : base(GameWindowSettings.Default, settings)
     {
+        this.task = task;
     }
 
     private static void Main(string[] args)
@@ -78,7 +83,10 @@ internal class Game : GameWindow
         settings.APIVersion = new Version(4, 1);
         settings.Flags |= ContextFlags.ForwardCompatible;
         settings.Title = "";
-        using (var game = new Game(settings))
+        string version = "Task1";
+        if (args.Length > 0)
+            version = args[0];
+        using (var game = new Game(settings, version))
         {
             game.Run();
         }
@@ -125,27 +133,34 @@ internal class Game : GameWindow
 
         // Set the clear color to blue
         GL.ClearColor(0.0f, 0.0f, 1.0f, 0.0f);
+        StartAction();
 
+
+        base.OnLoad();
+    }
+
+    private void StartAction()
+    {
         surface = new Surface(ClientSize.X, ClientSize.Y);
         interceptionPoints = new List<Vector2>();
-        expressionHandler = new ExpressionHandler(surface);
+        expressionHandler = new ExpressionHandler(surface, interceptionPoints);
         circle = new Utils.Circle(surface.width / 2, surface.height / 2, surface.height * 40 / 100,
             surface.width * 30 / 100);
-        expressionHandler.addExpression(new Utils.OuterCircle(circle));
+        // expressionHandler.addExpression(new Utils.OuterCircle(circle));
         expressionHandler.addExpression(circle);
-        // var origin = Utils.RandomPoint(surface);
 
         lastPoint = Utils.RandomPoint(surface);
         Vector2 direction = Utils.RandomPoint(surface);
         Vector2 nextInterception = Utils.CalculateInterceptionPoint(circle, lastPoint, direction);
+        
+        expressionHandler.addExpression(new Utils.LineSegment(lastPoint, nextInterception));
+        // expressionHandler.addExpression(new Utils.LineSegment(new Vector2(176, 195), new Vector2(338, 322)));
+        // expressionHandler.addExpression(new Utils.LineSegment(new Vector2(338, 322), new Vector2(306, 36)));
+
         lastPoint = nextInterception;
         lastDirection = direction;
         Console.WriteLine(nextInterception);
         interceptionPoints.Add(nextInterception);
-
-        expressionHandler.addExpression(new Utils.LineSegment(lastPoint, lastPoint - lastDirection));
-
-        base.OnLoad();
     }
 
     protected override void OnUnload()
@@ -204,8 +219,11 @@ internal class Game : GameWindow
         if (timer - lastUpdate >= 3.0)
         {
             lastDirection = Utils.ReflectVector(lastDirection, circle, lastPoint);
-            lastPoint = Utils.CalculateInterceptionPoint(circle, lastPoint, lastDirection);
-            expressionHandler.addExpression(new Utils.LineSegment(lastPoint, lastPoint - lastDirection));
+            Vector2 newPoint = Utils.CalculateInterceptionPoint(circle, lastPoint, lastDirection);
+            interceptionPoints.Add(newPoint);
+            Console.WriteLine(newPoint);
+            expressionHandler.addExpression(new Utils.LineSegment(lastPoint, newPoint));
+            lastPoint = newPoint;
             lastUpdate = timer;
         }
     }
@@ -270,5 +288,17 @@ public class Surface
     public void SetPixel(int x, int y, Vector3 color)
     {
         SetPixel(x, y, color.X, color.Y, color.Z);
+    }
+
+    public Vector3 GetPixel(int x, int y)
+    {
+        Vector3 res = new Vector3();
+        int c = pixels[x + y * width];
+
+        res.X = (c >> 16) * 255;
+        res.Y = (c >> 8) * 255;
+        res.Z = c & 255;
+
+        return res;
     }
 }
