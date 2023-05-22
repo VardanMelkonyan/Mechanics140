@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net7.0</TargetFramework>
+        <AssemblyName>mechanics</AssemblyName>
+        <RootNamespace>mechanics</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="OpenTK" Version="4.6.4"/>
+    </ItemGroup>
+</Project>
