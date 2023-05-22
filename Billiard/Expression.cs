@@ -4,17 +4,17 @@ namespace mechanics;
 
 internal abstract class Expression
 {
-    protected Vector3 color;
+    protected Vector3 white;
 
-    public Expression(Vector3 color)
+    public Expression(Vector3 white)
     {
-        this.color = color;
+        this.white = white;
     }
 
     // Default color white
     public Expression()
     {
-        color = new Vector3(255, 255, 255);
+        white = new Vector3(255, 255, 255);
     }
 
     public abstract bool PointBelongToExpression(float x, float y);
@@ -26,7 +26,7 @@ internal abstract class Expression
 
     public Vector3? GetPointColor(int x, int y)
     {
-        if (PointBelongToExpression(x, y)) return color;
+        if (PointBelongToExpression(x, y)) return white;
 
         return null;
     }

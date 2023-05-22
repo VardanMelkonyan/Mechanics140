@@ -55,6 +55,9 @@ internal class Game : GameWindow
     private List<Vector2> interceptionPoints;
 
     private double lastUpdate;
+    private Vector2 lastPoint;
+    private Vector2 lastDirection;
+    
     private int ShaderProgram;
     private Surface surface;
     private double timer;
@@ -128,24 +131,19 @@ internal class Game : GameWindow
         expressionHandler = new ExpressionHandler(surface);
         circle = new Utils.Circle(surface.width / 2, surface.height / 2, surface.height * 40 / 100,
             surface.width * 30 / 100);
+        expressionHandler.addExpression(new Utils.OuterCircle(circle));
         expressionHandler.addExpression(circle);
-        var direction = Utils.randomLineSegment(surface);
-        direction.end *= 1000;
         // var origin = Utils.RandomPoint(surface);
-        var points = Utils.FindInterceptionPoints(direction, circle);
-        Console.WriteLine(points);
-        interceptionPoints.Add(direction.start);
-        var nextPoint = points[0];
-        foreach (var point in points)
-        {
-            Console.WriteLine($"Point {point.X}:{point.Y}");
-            if (direction.PointBelongToExpression(point) &&
-                interceptionPoints[interceptionPoints.Capacity - 1] != point) nextPoint = point;
-        }
 
-        if (nextPoint.X == -1)
-            throw new Exception("Wrong calculations");
-        expressionHandler.addExpression(new Utils.LineSegment(direction.start, nextPoint));
+        lastPoint = Utils.RandomPoint(surface);
+        Vector2 direction = Utils.RandomPoint(surface);
+        Vector2 nextInterception = Utils.CalculateInterceptionPoint(circle, lastPoint, direction);
+        lastPoint = nextInterception;
+        lastDirection = direction;
+        Console.WriteLine(nextInterception);
+        interceptionPoints.Add(nextInterception);
+
+        expressionHandler.addExpression(new Utils.LineSegment(lastPoint, lastPoint - lastDirection));
 
         base.OnLoad();
     }
@@ -203,9 +201,13 @@ internal class Game : GameWindow
         base.OnUpdateFrame(e);
 
         timer += e.Time;
-        if (timer - lastUpdate >= 1.0)
-            // expressionHandler.addExpression(new Utils.LineSegment(Utils.RandomPoint(surface), Utils.RandomPoint(surface)));
+        if (timer - lastUpdate >= 3.0)
+        {
+            lastDirection = Utils.ReflectVector(lastDirection, circle, lastPoint);
+            lastPoint = Utils.CalculateInterceptionPoint(circle, lastPoint, lastDirection);
+            expressionHandler.addExpression(new Utils.LineSegment(lastPoint, lastPoint - lastDirection));
             lastUpdate = timer;
+        }
     }
 }
 

@@ -52,86 +52,30 @@ internal class Utils
         return CalculatePointDistance(v1.X, v1.Y, v2.X, v2.Y);
     }
 
-    // public static List<Vector2> FindInterceptionPoints(LineSegment line, Circle circle)
-    // {
-    //     float dx = line.end.X - line.start.X;
-    //     float dy = line.end.Y - line.start.Y;
-    //     float dr = (float)Math.Sqrt(dx * dx + dy * dy);
-    //     float D = line.start.X * line.end.Y - line.end.X * line.start.Y;
-    //
-    //     float discriminant = circle.radius * circle.radius * dr * dr - D * D; 
-    //     
-    //     List<Vector2> interceptions = new List<Vector2>(2);
-    //     if (discriminant == 0)
-    //     {
-    //         float x = D * dy / (dr * dr);
-    //         float y = -D * dx / (dr * dr);
-    //         interceptions.Add(new Vector2(x, y));
-    //     }
-    //     else if (discriminant > 0)
-    //     {
-    //         float x = (float)(D * dy + Math.Sign(dy) * dx * Math.Sqrt(discriminant)) / (dr * dr);
-    //         float y = (float)(-D * dx + Math.Abs(dy) * Math.Sqrt(discriminant)) / (dr * dr);
-    //         interceptions.Add(new Vector2(x, y));
-    //         x = (float)(D * dy - Math.Sign(dy) * dx * Math.Sqrt(discriminant)) / (dr * dr);
-    //         y = (float)(-D * dx - Math.Abs(dy) * Math.Sqrt(discriminant)) / (dr * dr);
-    //         interceptions.Add(new Vector2(x, y));
-    //     }
-    //     return interceptions;
-    // }
-
-    public static List<Vector2> FindInterceptionPoints(LineSegment line, Circle circle)
+    public static Vector2 CalculateInterceptionPoint(Circle circle, Vector2 origin, Vector2 direction)
     {
-        var res = new List<Vector2>(2);
-        float x, y, A, B, C, D;
-        var (m, c) = (line.slope, line.yIntercept);
-        var (p, q, r) = (circle.centerX, circle.centerY, circle.radius);
+        // Calculate the vector from the circle center to the point
+        Vector2 fromCenter = origin - new Vector2(circle.centerX, circle.centerY);
 
-        if (line.start.X == line.end.Y)
+        // Calculate the dot product of the direction vector and the vector from the center
+        float dotProduct = Vector2.Dot(direction, fromCenter);
+
+        // Calculate the discriminant for the interception point calculation
+        float discriminant = dotProduct * dotProduct - direction.LengthSquared * (fromCenter.LengthSquared - circle.radius * circle.radius);
+
+        if (discriminant < 0)
         {
-            x = line.start.X;
-            B = -2 * q;
-            C = p * p + q * q - r * r + x * x - 2 * p * x;
-            D = B * B - 4 * C;
-            if (D == 0)
-            {
-                res.Add(new Vector2(x, -q));
-            }
-            else if (D > 0)
-            {
-                D = (float)Math.Sqrt(D);
-                res.Add(new Vector2(x, (-B - D) / 2));
-                res.Add(new Vector2(x, (-B + D) / 2));
-            }
+            throw new Exception("Incorrect determinant");
         }
         else
         {
-            A = m * m + 1;
-            B = 2 * (m * c - m * q - p);
-            C = p * p + q * q - r * r + c * c - 2 * c * q;
-            D = B * B - 4 * A * C;
-            if (D == 0)
-            {
-                x = -B / (2 * A);
-                y = m * x + c;
-                res.Add(new Vector2(x, y));
-            }
-            else if (D > 0)
-            {
-                D = (float)Math.Sqrt(D);
-                x = (-B - D) / (2 * A);
-                y = m * x + c;
-                res.Add(new Vector2(x, y));
-                x = (-B + D) / (2 * A);
-                y = m * x + c;
-                res.Add(new Vector2(x, y));
-            }
+            float t = (-dotProduct - (float)Math.Sqrt(discriminant)) / direction.LengthSquared;
+            Vector2 interception = origin + (direction * t);
+            return interception;
         }
-
-        return res;
     }
 
-    public static void ReflectVector(Vector2 vector, Circle circle, Vector2 point)
+    public static Vector2 ReflectVector(Vector2 vector, Circle circle, Vector2 point)
     {
         // Calculate the vector from the circle center to the point
         var circleToPointX = point.X - circle.centerX;
@@ -149,7 +93,7 @@ internal class Utils
         var reflectionVectorX = vector.X - 2 * dotProduct * normalizedCircleToPointX;
         var reflectionVectorY = vector.Y - 2 * dotProduct * normalizedCircleToPointY;
 
-        Console.WriteLine($"Reflection Vector: ({reflectionVectorX}, {reflectionVectorY})");
+        return new Vector2(reflectionVectorX, reflectionVectorY);
     }
 
 
@@ -187,6 +131,23 @@ internal class Utils
             return distanceSquared <= radiusSquared;
         }
     }
+    
+    
+    public class OuterCircle : Expression
+    {
+        private Circle _circle;
+        public OuterCircle(Circle circle) : base(new Vector3())
+        {
+            _circle = circle;
+        }
+        public override bool PointBelongToExpression(float x, float y)
+        {
+            var distanceSquared = (x - _circle.centerX) * (x - _circle.centerX) + (y - _circle.centerY) * (y - _circle.centerY);
+            var radiusSquared = _circle.radius * _circle.radius;
+
+            return distanceSquared >= radiusSquared && !_circle.PointBelongToExpression(x, y);
+        }
+    }
 
 
     // Will not be using for now
@@ -222,7 +183,7 @@ internal class Utils
         {
             this.start = start;
             this.end = end;
-            var vector = end - start;
+            Vector2 vector = end - start;
             slope = vector.Y / vector.X;
             yIntercept = start.X - slope * start.Y;
             this.delta = delta;
@@ -231,6 +192,11 @@ internal class Utils
 
         public override bool PointBelongToExpression(float x, float y)
         {
+            
+            bool isWithinXBoundaries = (x >= start.X ^ x <= end.X);
+            bool isWithinYBoundaries = (y >= start.Y ^ y <= end.Y);
+            if (!isWithinXBoundaries || !isWithinYBoundaries)
+                return false;
             // Calculate the distance between the point and the line defined by the segment
             var distance = CalculateDistance(x, y);
 

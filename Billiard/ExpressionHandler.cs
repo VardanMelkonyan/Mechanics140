@@ -20,7 +20,7 @@ internal class ExpressionHandler
             foreach (var expression in expressions)
             {
                 var color = expression.GetPointColor(x, y);
-                if (color.HasValue) surface.SetPixel(x, y, color.GetValueOrDefault());
+                if (color.HasValue && !expressions[0].PointBelongToExpression(x, y)) surface.SetPixel(x, y, color.GetValueOrDefault());
             }
     }
 
